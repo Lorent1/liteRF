@@ -51,13 +51,13 @@ if (NOT MSVC)
 endif()
 
 if(USE_VULKAN)
-  add_executable(testapp main.cpp
-                 example_tracer/example_tracer.cpp
+  add_executable(simplerf main.cpp
+                 tracers/tracer.cpp
                  external/LiteMath/Image2d.cpp
 
-                 example_tracer/example_tracer_generated.cpp
-                 example_tracer/example_tracer_generated_ds.cpp
-                 example_tracer/example_tracer_generated_init.cpp
+                 tracers/tracer_generated.cpp
+                 tracers/tracer_generated_ds.cpp
+                 tracers/tracer_generated_init.cpp
 
                  external/vkutils/vk_utils.cpp
                  external/vkutils/vk_copy.cpp
@@ -68,16 +68,16 @@ if(USE_VULKAN)
                  external/vkutils/vk_pipeline.cpp
                  external/vkutils/vk_descriptor_sets.cpp)
 
-  set_target_properties(testapp PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-  target_link_libraries(testapp LINK_PUBLIC OpenMP::OpenMP_CXX volk "${PLATFORM_DEPENDEPNT_LIBS}")
+  set_target_properties(simplerf PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+  target_link_libraries(simplerf LINK_PUBLIC OpenMP::OpenMP_CXX volk "${PLATFORM_DEPENDEPNT_LIBS}")
 
 else()
-  add_executable(testapp main.cpp
-                 example_tracer/example_tracer.cpp
-                 external/LiteMath/Image2d.cpp)
+  add_executable(simplerf main.cpp
+                tracers/tracer.cpp
+                external/LiteMath/Image2d.cpp)
 
-  set_target_properties(testapp PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+  set_target_properties(simplerf PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
-  target_link_libraries(testapp LINK_PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(simplerf LINK_PUBLIC OpenMP::OpenMP_CXX)
 endif()
 

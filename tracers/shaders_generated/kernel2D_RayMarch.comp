@@ -1,0 +1,76 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+#include "common_generated.h"
+
+layout(binding = 0, set = 0) buffer data0 { uint out_color[]; }; //
+layout(binding = 1, set = 0) buffer data1 { Cell grid[128]; }; //
+layout(binding = 2, set = 0) buffer dataUBO { RayMarcherExample_Generated_UBO_Data ubo; };
+
+vec4 RaymarchSpherical_grid(vec3 ro, vec3 rd, float tmin, float tmax, inout float alpha, uint gridDataOffset, int gridSize) {
+    float stepSize =(tmax - tmin) / 250.0f;
+
+    vec3 color = vec3(0.0f);
+    float densitySum = 0.0f;
+
+    for (int i = 0; i < 250; i++) {
+        vec3 pos = ro + rd * mix(tmin, tmax, float(i) / 249.0);
+        CellData cell = eval_trilinear(pos, rd, grid, gridSize);
+
+        cell.density = max(0.0f, cell.density);
+        cell.color = clamp(cell.color * 0.32f + 0.54f, vec3(0.0), vec3(1.0));
+
+        color += cell.color
+            * exp(-densitySum)
+            * (1.0 - exp(-cell.density * stepSize));
+
+        densitySum += stepSize * cell.density;
+    }
+
+    return vec4(color, alpha);
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+layout(local_size_x = 32, local_size_y = 8, local_size_z = 1) in;
+
+layout( push_constant ) uniform kernelArgs
+{
+  int height; 
+  int width; 
+  uint iNumElementsZ; 
+  uint tFlagsMask;    
+} kgenArgs;
+
+
+void main()
+{
+  bool runThisThread = true;
+  ///////////////////////////////////////////////////////////////// prolog
+  const int y = int(gl_GlobalInvocationID[0]); 
+  const int x = int(gl_GlobalInvocationID[1]); 
+  if(y >= kgenArgs.height + 0 || x >= kgenArgs.width + 0)
+    runThisThread = false;
+    ///////////////////////////////////////////////////////////////// prolog
+  if(runThisThread)
+  {
+  
+            vec3 rayDir = EyeRayDir((float(x) + 0.5f) / float(kgenArgs.width), (float(y) + 0.5f) / float(kgenArgs.height), ubo.m_worldViewProjInv);
+            vec3 rayPos = vec3(0.0f,0.26f,0.0f);
+
+            transform_ray3f(ubo.m_worldViewInv, rayPos, rayDir);
+
+            vec2 tNearAndFar = RayBoxIntersection(rayPos, rayDir, ubo.bb.min, ubo.bb.max);
+
+            vec4 resColor = vec4(0.0f);
+            float alpha = 1.0f;
+            resColor = RaymarchSpherical_grid(rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, alpha, 0, ubo.gridSize);
+
+            //std::cout << resColor.x << "\n";
+            out_color[uint(y) * kgenArgs.width + uint(x)] = RealColorToUint32(resColor);
+        
+  }
+}
+

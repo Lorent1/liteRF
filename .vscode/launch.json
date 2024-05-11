@@ -5,10 +5,30 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name"   : "Launch",
+            "name"   : "Launch (cpu)",
             "type"   : "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/cmake-build-release/testapp",
+            "program": "${workspaceFolder}/cmake-build-release/simplerf",
+            "args"   : ["aaa", "bbb"],
+            "stopAtEntry": false,
+            "cwd"    : "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+
+        {
+            "name"   : "Launch (gpu)",
+            "type"   : "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/cmake-build-release-gpu/simplerf",
             "args"   : ["aaa", "bbb"],
             "stopAtEntry": false,
             "cwd"    : "${workspaceFolder}",

@@ -5,7 +5,7 @@
 #include <iomanip> // for std::fixed/std::setprecision
 #include <sstream>
 
-#include "example_tracer/example_tracer.h"
+#include "tracers/tracer.h"
 #include "Image2d.h"
 
 #ifdef USE_VULKAN
@@ -22,8 +22,8 @@ int main(int argc, const char** argv)
     bool enableValidationLayers = false;
 #endif
 
-    uint WIN_WIDTH = 512;
-    uint WIN_HEIGHT = 512;
+    uint WIN_WIDTH = 128;
+    uint WIN_HEIGHT = 128;
 
     std::shared_ptr<RayMarcherExample> pImpl = nullptr;
 #ifdef USE_VULKAN
@@ -53,7 +53,7 @@ int main(int argc, const char** argv)
         exit(1);
     }
 
-    if (filename == "./model.dat") {
+    if (filename == "./model2.dat") {
         fin.read((char*)&gridSize, sizeof(int));
         fin.read((char*)&factor, sizeof(float));
     }
@@ -70,10 +70,10 @@ int main(int argc, const char** argv)
     }
     fin.close();
 
-    const int frameNum = 128;
+    const int framesNum = 128;
 
-    for (int k = 0; k < frameNum; k++) {
-        float4x4 viewMat = lookAt(float3(0.0, 0.0, 1.3), float3(0.0, 0.0, 0.0), float3(0.0, 1.0, 0.0)) * rotate4x4Y(-float(360.0 / frameNum * k) * DEG_TO_RAD) * translate4x4(float3(-0.5, -0.5, -0.5));
+    for (int k = 0; k < framesNum; k++) {
+        float4x4 viewMat = lookAt(float3(0.0, 0.0, 1.3), float3(0.0, 0.0, 0.0), float3(0.0, 1.0, 0.0)) * rotate4x4Y(-float(360.0 / framesNum * k) * DEG_TO_RAD) * translate4x4(float3(-0.5, -0.5, -0.5));
         pImpl->SetWorldViewMatrix(viewMat);
 
         pImpl->UpdateMembersPlainData();                                            // copy all POD members from CPU to GPU in GPU implementation

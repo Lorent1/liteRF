@@ -17,13 +17,41 @@ struct Cell {
   float sh_b[SH_WIDTH];
 };
 
+// static inline Cell operator* (Cell cell, float number) {
+//     cell.density *= number;
+
+//     for (size_t i = 0; i < SH_WIDTH; i++) {
+//         cell.sh_r[i] *= number;
+//         cell.sh_g[i] *= number;
+//         cell.sh_b[i] *= number;
+//     }
+
+//     return cell;
+// };
+
+// static inline Cell operator+ (Cell a, Cell b) {
+//     a.density += b.density;
+
+//     for (size_t i = 0; i < SH_WIDTH; i++) {
+//         a.sh_r[i] += b.sh_r[i];
+//         a.sh_g[i] += b.sh_g[i];
+//         a.sh_b[i] += b.sh_b[i];
+//     }
+    
+//     return a;
+// };
+
 struct BoundingBox {
   float3 min;
   float3 max;
 };
 
-class RayMarcherExample // : public IRenderAPI
-{
+struct CellData {
+    float3 color;
+    float density;
+};
+
+class RayMarcherExample{ // : public IRenderAPI
 public:
 
   RayMarcherExample()
@@ -66,12 +94,11 @@ public:
   //virtual void UpdateMembersVectorData() {}                              // will be overriden in generated class (optional function)
   //virtual void UpdateMembersTexureData() {}                              // will be overriden in generated class (optional function)
   virtual void GetExecutionTime(const char* a_funcName, float a_out[4]);   // will be overriden in generated class
-
+  
   std::vector<Cell> grid;
-  size_t gridSize;
-  BoundingBox bb;
-
 protected:
+  int gridSize;
+  BoundingBox bb;
 
   float4x4 m_worldViewProjInv;
   float4x4 m_worldViewInv;

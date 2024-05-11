@@ -36,5 +36,6 @@
 .vscode
 out_*
 model.*
+cmake-build-*
 
 config.txt

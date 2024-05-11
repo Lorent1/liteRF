@@ -1,39 +1,32 @@
 #include <vector>
 #include <chrono>
 #include <string>
-#include <omp.h>
 
-
-#include "example_tracer.h"
-
-struct CellData {
-    float3 color;
-    float density;
-};
+#include "tracer.h"
 
 // From Mitsuba 3
-void sh_eval_2(const float3 &d, float *out) {
+void sh_eval_2(const float3 &d, float* sh_coeffs) {
     float x = d.x, y = d.y, z = d.z, z2 = z * z;
     float c0, c1, s0, s1, tmp_a, tmp_b, tmp_c;
 
-    out[0] = 0.28209479177387814;
-    out[2] = z * 0.488602511902919923;
-    out[6] = z2 * 0.94617469575756008 + -0.315391565252520045;
+    sh_coeffs[0] = 0.28209479177387814;
+    sh_coeffs[2] = z * 0.488602511902919923;
+    sh_coeffs[6] = z2 * 0.94617469575756008 + -0.315391565252520045;
     c0 = x;
     s0 = y;
 
     tmp_a = -0.488602511902919978;
-    out[3] = tmp_a * c0;
-    out[1] = tmp_a * s0;
+    sh_coeffs[3] = tmp_a * c0;
+    sh_coeffs[1] = tmp_a * s0;
     tmp_b = z * -1.09254843059207896;
-    out[7] = tmp_b * c0;
-    out[5] = tmp_b * s0;
+    sh_coeffs[7] = tmp_b * c0;
+    sh_coeffs[5] = tmp_b * s0;
     c1 = x * c0 - y * s0;
     s1 = x * s0 + y * c0;
 
     tmp_c = 0.546274215296039478;
-    out[8] = tmp_c * c1;
-    out[4] = tmp_c * s1;
+    sh_coeffs[8] = tmp_c * c1;
+    sh_coeffs[4] = tmp_c * s1;
 }
 
 float eval_sh(float* sh, float3 rayDir) {
@@ -47,42 +40,61 @@ float eval_sh(float* sh, float3 rayDir) {
   return sum;
 }
 
-static inline Cell operator* (Cell cell, float number) {
-    cell.density *= number;
-    for (size_t i = 0; i < SH_WIDTH; i++) {
-        cell.sh_r[i] *= number;
-        cell.sh_g[i] *= number;
-        cell.sh_b[i] *= number;
-    }
-    return cell;
-};
+// Cell trilerp(Cell* values, float3 pos ) {
+//     float3 n = { 1.0f - pos.x, 1.0f - pos.y, 1.0f - pos.z };
 
-static inline Cell operator+ (Cell a, Cell b) {
-    a.density += b.density;
-    for (size_t i = 0; i < SH_WIDTH; i++) {
-        a.sh_r[i] += b.sh_r[i];
-        a.sh_g[i] += b.sh_g[i];
-        a.sh_b[i] += b.sh_b[i];
-    }
-    return a;
-};
+//     return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
+//         + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
+//         + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
+//             + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
+// }
 
+Cell mult(Cell cell, float number){
+  cell.density *= number;
 
-Cell trilerp(Cell* values, float3 pos ) {
-    float3 n = { 1.0f - pos.x, 1.0f - pos.y, 1.0f - pos.z };
+  for (uint i = 0; i < SH_WIDTH; i++) {
+      cell.sh_r[i] *= number;
+      cell.sh_g[i] *= number;
+      cell.sh_b[i] *= number;
+  }
 
-    return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
-        + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
-        + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
-            + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
+  return cell;
 }
 
-int indexOf(float3 pos, size_t gridSize) {
-    return pos.x + gridSize * pos.z + gridSize * gridSize * pos.y;
+Cell add(Cell rh, Cell lh){
+  rh.density += lh.density;
+
+  for (uint i = 0; i < SH_WIDTH; i++) {
+      rh.sh_r[i] += lh.sh_r[i];
+      rh.sh_g[i] += lh.sh_g[i];
+      rh.sh_b[i] += lh.sh_b[i];
+  }
+
+  return rh;
+}
+
+Cell trilerp(Cell* values, float3 pos) {
+    float3 n = float3(1.0f - pos.x,1.0f - pos.y,1.0f - pos.z);
+
+    Cell first = mult(add(mult(values[0], n.z), mult(values[1], pos.z)), n.y);
+    Cell second = mult(add(mult(values[2], n.z), mult(values[3], pos.z)), pos.y);
+    Cell third = mult(add(mult(values[4], n.z), mult(values[5], pos.z)), n.y);
+    Cell fourth = mult(add(mult(values[6], n.z), mult(values[7], pos.z)), pos.y);
+
+
+    // return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
+    //     + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
+    //     + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
+    //         + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
+    return add(mult(add(first, second), n.x), mult(add(third, fourth), pos.x));
+}
+
+int indexOf(float3 pos, int gridSize) {
+    return pos.x + gridSize * pos.y + gridSize * gridSize * pos.z;
 }
 
 
-CellData eval_trilinear(float3 pos, float3 rd, Cell* gridData, size_t gridSize) {
+CellData eval_trilinear(float3 pos, float3 rd, Cell* gridData, int gridSize) {
     const float EPS = 0.01f;
 
     CellData result;
@@ -102,7 +114,7 @@ CellData eval_trilinear(float3 pos, float3 rd, Cell* gridData, size_t gridSize) 
         return result;
     }
 
-    float3 indices[8] = { float3(0.0f) };
+    float3 indices[8];
     Cell values[8];
 
     indices[0] = { floor_pos.x, floor_pos.y, floor_pos.z };
@@ -170,7 +182,7 @@ static inline void transform_ray3f(float4x4 a_mWorldViewInv, float3* ray_pos, fl
   (*ray_dir) = to_float3(normalize(rayDirTransformed));
 }
 
-float4 RaymarchSpherical(float3 ro, float3 rd, float tmin, float tmax, float& alpha, Cell* gridData, size_t gridSize) {
+float4 RaymarchSpherical(float3 ro, float3 rd, float tmin, float tmax, float& alpha, Cell* gridData, int gridSize) {
     float stepSize =(tmax - tmin) / 250.0f;
 
     float3 color = float3(0.0f);
@@ -205,9 +217,6 @@ static inline uint32_t RealColorToUint32(float4 real_color) {
 }
 
 void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, uint32_t height) {
-#pragma omp parallel
-{
-    #pragma omp for
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             float3 rayDir = EyeRayDir((float(x) + 0.5f) / float(width), (float(y) + 0.5f) / float(height), m_worldViewProjInv);
@@ -224,7 +233,6 @@ void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, u
             //std::cout << resColor.x << "\n";
             out_color[y * width + x] = RealColorToUint32(resColor);
         };
-    };
     };
 }
 

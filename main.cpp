@@ -42,7 +42,7 @@ int main(int argc, const char** argv)
     pImpl->CommitDeviceData();
 
     std::vector<uint> pixelData(WIN_WIDTH * WIN_HEIGHT);
-    char* filename = "./model2.dat";
+    char* filename = "./model.dat";
 
     size_t gridSize = 128;
     float factor = 1;
@@ -50,9 +50,10 @@ int main(int argc, const char** argv)
 
     if (!fin) {
         std::cout << "Couldn't open file!";
+        exit(1);
     }
 
-    if (filename == "./model2.dat") {
+    if (filename == "./model.dat") {
         fin.read((char*)&gridSize, sizeof(int));
         fin.read((char*)&factor, sizeof(float));
     }

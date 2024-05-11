@@ -1,11 +1,133 @@
 #include <vector>
 #include <chrono>
 #include <string>
+#include <omp.h>
+
 
 #include "example_tracer.h"
 
-float2 RayBoxIntersection(float3 ray_pos, float3 ray_dir, float3 boxMin, float3 boxMax)
-{
+struct CellData {
+    float3 color;
+    float density;
+};
+
+// From Mitsuba 3
+void sh_eval_2(const float3 &d, float *out) {
+    float x = d.x, y = d.y, z = d.z, z2 = z * z;
+    float c0, c1, s0, s1, tmp_a, tmp_b, tmp_c;
+
+    out[0] = 0.28209479177387814;
+    out[2] = z * 0.488602511902919923;
+    out[6] = z2 * 0.94617469575756008 + -0.315391565252520045;
+    c0 = x;
+    s0 = y;
+
+    tmp_a = -0.488602511902919978;
+    out[3] = tmp_a * c0;
+    out[1] = tmp_a * s0;
+    tmp_b = z * -1.09254843059207896;
+    out[7] = tmp_b * c0;
+    out[5] = tmp_b * s0;
+    c1 = x * c0 - y * s0;
+    s1 = x * s0 + y * c0;
+
+    tmp_c = 0.546274215296039478;
+    out[8] = tmp_c * c1;
+    out[4] = tmp_c * s1;
+}
+
+float eval_sh(float* sh, float3 rayDir) {
+  float sh_coeffs[SH_WIDTH];
+  sh_eval_2(rayDir, sh_coeffs);
+
+  float sum = 0.0f;
+  for (int i = 0; i < SH_WIDTH; i++)
+    sum += sh[i] * sh_coeffs[i];
+
+  return sum;
+}
+
+static inline Cell operator* (Cell cell, float number) {
+    cell.density *= number;
+    for (size_t i = 0; i < SH_WIDTH; i++) {
+        cell.sh_r[i] *= number;
+        cell.sh_g[i] *= number;
+        cell.sh_b[i] *= number;
+    }
+    return cell;
+};
+
+static inline Cell operator+ (Cell a, Cell b) {
+    a.density += b.density;
+    for (size_t i = 0; i < SH_WIDTH; i++) {
+        a.sh_r[i] += b.sh_r[i];
+        a.sh_g[i] += b.sh_g[i];
+        a.sh_b[i] += b.sh_b[i];
+    }
+    return a;
+};
+
+
+Cell trilerp(Cell* values, float3 pos ) {
+    float3 n = { 1.0f - pos.x, 1.0f - pos.y, 1.0f - pos.z };
+
+    return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
+        + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
+        + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
+            + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
+}
+
+int indexOf(float3 pos, size_t gridSize) {
+    return pos.x + gridSize * pos.z + gridSize * gridSize * pos.y;
+}
+
+
+CellData eval_trilinear(float3 pos, float3 rd, Cell* gridData, size_t gridSize) {
+    const float EPS = 0.01f;
+
+    CellData result;
+    result.color = float3(0.0);
+    result.density = 0;
+
+    if (pos.x < EPS || pos.y < EPS || pos.z < EPS
+        || pos.x > 1.0 - EPS || pos.y > 1.0 - EPS || pos.z > 1.0 - EPS) {
+        return result;
+    }
+
+    pos *= gridSize;
+
+    float3 floor_pos = floor({ pos.x, pos.y, pos.z });
+
+    if (floor_pos.x + 1 > gridSize || floor_pos.y + 1 > gridSize || floor_pos.z + 1 > gridSize) {
+        return result;
+    }
+
+    float3 indices[8] = { float3(0.0f) };
+    Cell values[8];
+
+    indices[0] = { floor_pos.x, floor_pos.y, floor_pos.z };
+    indices[1] = { floor_pos.x, floor_pos.y, floor_pos.z + 1 };
+    indices[2] = { floor_pos.x, floor_pos.y + 1, floor_pos.z };
+    indices[3] = { floor_pos.x, floor_pos.y + 1, floor_pos.z + 1 };
+    indices[4] = { floor_pos.x + 1, floor_pos.y, floor_pos.z };
+    indices[5] = { floor_pos.x + 1, floor_pos.y, floor_pos.z + 1 };
+    indices[6] = { floor_pos.x + 1, floor_pos.y + 1, floor_pos.z };
+    indices[7] = { floor_pos.x + 1, floor_pos.y + 1, floor_pos.z + 1 };
+
+    for (int i = 0; i < 8; i++) {
+        values[i] = gridData[indexOf(indices[i], gridSize)];
+    }
+
+    float3 coeffs = { fract(pos.x), fract(pos.y), fract(pos.z) };
+    Cell cell = trilerp(values, coeffs);
+
+    result.density = cell.density;
+    result.color = { eval_sh(cell.sh_r, rd), eval_sh(cell.sh_g, rd), eval_sh(cell.sh_b, rd) };
+
+    return result;
+}
+
+float2 RayBoxIntersection(float3 ray_pos, float3 ray_dir, float3 boxMin, float3 boxMax){
   ray_dir.x = 1.0f/ray_dir.x; // may precompute if intersect many boxes
   ray_dir.y = 1.0f/ray_dir.y; // may precompute if intersect many boxes
   ray_dir.z = 1.0f/ray_dir.z; // may precompute if intersect many boxes
@@ -48,63 +170,62 @@ static inline void transform_ray3f(float4x4 a_mWorldViewInv, float3* ray_pos, fl
   (*ray_dir) = to_float3(normalize(rayDirTransformed));
 }
 
-float4 RayMarchConstantFog(float tmin, float tmax, float& alpha)
-{
-  float dt = 0.05f;
-	float t  = tmin;
-	
-	alpha = 1.0f;
-	float4 color = float4(0.0f);
-	
-	while(t < tmax && alpha > 0.01f)
-	{
-	  float a = 0.025f;
-	  color += a*alpha*float4(1.0f,1.0f,0.0f,0.0f);
-	  alpha *= (1.0f-a);
-	  t += dt;
-	}
-	
-	return color;
-}
+float4 RaymarchSpherical(float3 ro, float3 rd, float tmin, float tmax, float& alpha, Cell* gridData, size_t gridSize) {
+    float stepSize =(tmax - tmin) / 250.0f;
 
-static inline uint32_t RealColorToUint32(float4 real_color)
-{
-  float  r = real_color[0]*255.0f;
-  float  g = real_color[1]*255.0f;
-  float  b = real_color[2]*255.0f;
-  float  a = real_color[3]*255.0f;
+    float3 color = float3(0.0f);
+    float densitySum = 0.0f;
 
-  uint32_t red   = (uint32_t)r;
-  uint32_t green = (uint32_t)g;
-  uint32_t blue  = (uint32_t)b;
-  uint32_t alpha = (uint32_t)a;
+    for (int i = 0; i < 250; i++) {
+        float3 pos = ro + rd * lerp(tmin, tmax, (float)i / 249.0);
+        CellData cell = eval_trilinear(pos, rd, gridData, gridSize);
 
-  return red | (green << 8) | (blue << 16) | (alpha << 24);
-}
+        cell.density = max(0.0f, cell.density);
+        cell.color = clamp(cell.color * 0.32f + 0.54f, float3(0.0), float3(1.0));
 
-void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, uint32_t height) 
-{
-  for(uint32_t y=0;y<height;y++) 
-  {
-    for(uint32_t x=0;x<width;x++) 
-    {
-      float3 rayDir = EyeRayDir((float(x) + 0.5f) / float(width), (float(y) + 0.5f) / float(height), m_worldViewProjInv); 
-      float3 rayPos = float3(0.0f, 0.0f, 0.0f);
+        color += cell.color
+            * exp(-densitySum)
+            * (1.0 - exp(-cell.density * stepSize));
 
-      transform_ray3f(m_worldViewInv, &rayPos, &rayDir);
-      
-      float2 tNearAndFar = RayBoxIntersection(rayPos, rayDir, float3(-1,-1,-1), float3(1,1,1));
-      
-      float4 resColor(0.0f);
-      if(tNearAndFar.x < tNearAndFar.y && tNearAndFar.x > 0.0f)
-      {
-        float alpha = 1.0f;
-	      resColor = RayMarchConstantFog(tNearAndFar.x, tNearAndFar.y, alpha);
-      }
-      
-      out_color[y*width+x] = RealColorToUint32(resColor);
+        densitySum += stepSize * cell.density;
     }
-  }
+
+    //std::cout << color.x << " " << color.y << " " << color.z << "\n";
+
+    return to_float4(color, alpha);
+}
+
+static inline uint32_t RealColorToUint32(float4 real_color) {
+    int red = std::max(0, std::min(255, (int)(real_color[0] * 255.0f)));
+    int green = std::max(0, std::min(255, (int)(real_color[1] * 255.0f)));
+    int blue = std::max(0, std::min(255, (int)(real_color[2] * 255.0f)));
+    int alpha = std::max(0, std::min(255, (int)(real_color[3] * 255.0f)));
+
+    return red | (green << 8) | (blue << 16) | (alpha << 24);
+}
+
+void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, uint32_t height) {
+#pragma omp parallel
+{
+    #pragma omp for
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            float3 rayDir = EyeRayDir((float(x) + 0.5f) / float(width), (float(y) + 0.5f) / float(height), m_worldViewProjInv);
+            float3 rayPos = float3(0.0f, 0.26f, 0.0f);
+
+            transform_ray3f(m_worldViewInv, &rayPos, &rayDir);
+
+            float2 tNearAndFar = RayBoxIntersection(rayPos, rayDir, bb.min, bb.max);
+
+            float4 resColor(0.0f);
+            float alpha = 1.0f;
+            resColor = RaymarchSpherical(rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, alpha, grid.data(), gridSize);
+
+            //std::cout << resColor.x << "\n";
+            out_color[y * width + x] = RealColorToUint32(resColor);
+        };
+    };
+    };
 }
 
 void RayMarcherExample::RayMarch(uint32_t* out_color, uint32_t width, uint32_t height)

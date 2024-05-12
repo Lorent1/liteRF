@@ -7,6 +7,7 @@
 
 #include "tracers/tracer.h"
 #include "Image2d.h"
+#include <chrono>
 
 #ifdef USE_VULKAN
 #include "vk_context.h"
@@ -30,7 +31,7 @@ int main(int argc, const char** argv)
     bool onGPU = true; // TODO: you can read it from command line
     if (onGPU)
     {
-        auto ctx = vk_utils::globalContextGet(enableValidationLayers, 0);
+        auto ctx = vk_utils::globalContextGet(enableValidationLayers, 1);
         pImpl = CreateRayMarcherExample_Generated(ctx, WIN_WIDTH * WIN_HEIGHT);
     }
     else
@@ -58,14 +59,25 @@ int main(int argc, const char** argv)
         fin.read((char*)&factor, sizeof(float));
     }
 
-    pImpl->InitGrid(gridSize);
+    pImpl->initGrid(gridSize);
+    std::vector<Cell> grid(gridSize * gridSize * gridSize);
+
+    for (size_t i = 0; i < gridSize * gridSize * gridSize; i++) {
+      grid[i].density = 0.02;
+      for (size_t j = 0; j < SH_WIDTH; j++) {
+        grid[i].sh_r[j] = 0.1;
+        grid[i].sh_g[j] = 0.1;
+        grid[i].sh_b[j] = 0.1;
+      }
+    }
+
     pImpl->SetBoundingBox(float3(0, 0, 0), float3(1, 1, 1));
     pImpl->SetWorldViewMProjatrix(perspectiveMatrix(45, 1, 0.1, 100));
 
-    fin.read((char*)&pImpl->grid[0], pImpl->grid.size() * sizeof(Cell));
+    fin.read((char*)&grid[0], grid.size() * sizeof(Cell));
     if (filename == "./model2.dat") {
-        for (int i = 0; i < pImpl->grid.size(); i++) {
-            pImpl->grid[i].density *= factor;
+        for (int i = 0; i < grid.size(); i++) {
+            grid[i].density *= factor;
         }
     }
     fin.close();
@@ -77,7 +89,7 @@ int main(int argc, const char** argv)
         pImpl->SetWorldViewMatrix(viewMat);
 
         pImpl->UpdateMembersPlainData();                                            // copy all POD members from CPU to GPU in GPU implementation
-        pImpl->RayMarch(pixelData.data(), WIN_WIDTH, WIN_HEIGHT);
+        pImpl->RayMarch(pixelData.data(), grid.data(), WIN_WIDTH, WIN_HEIGHT);
 
         float timings[4] = { 0,0,0,0 };
         pImpl->GetExecutionTime("RayMarch", timings);

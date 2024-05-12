@@ -40,15 +40,6 @@ float eval_sh(float* sh, float3 rayDir) {
   return sum;
 }
 
-// Cell trilerp(Cell* values, float3 pos ) {
-//     float3 n = { 1.0f - pos.x, 1.0f - pos.y, 1.0f - pos.z };
-
-//     return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
-//         + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
-//         + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
-//             + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
-// }
-
 Cell mult(Cell cell, float number){
   cell.density *= number;
 
@@ -81,11 +72,6 @@ Cell trilerp(Cell* values, float3 pos) {
     Cell third = mult(add(mult(values[4], n.z), mult(values[5], pos.z)), n.y);
     Cell fourth = mult(add(mult(values[6], n.z), mult(values[7], pos.z)), pos.y);
 
-
-    // return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
-    //     + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
-    //     + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
-    //         + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
     return add(mult(add(first, second), n.x), mult(add(third, fourth), pos.x));
 }
 
@@ -110,7 +96,7 @@ CellData eval_trilinear(float3 pos, float3 rd, Cell* gridData, int gridSize) {
 
     float3 floor_pos = floor({ pos.x, pos.y, pos.z });
 
-    if (floor_pos.x + 1 > gridSize || floor_pos.y + 1 > gridSize || floor_pos.z + 1 > gridSize) {
+    if (floor_pos.x + 1 >= gridSize || floor_pos.y + 1 >= gridSize || floor_pos.z + 1 >= gridSize) {
         return result;
     }
 
@@ -127,6 +113,7 @@ CellData eval_trilinear(float3 pos, float3 rd, Cell* gridData, int gridSize) {
     indices[7] = { floor_pos.x + 1, floor_pos.y + 1, floor_pos.z + 1 };
 
     for (int i = 0; i < 8; i++) {
+        //std::cout << "\n" << indices[i].z << "\n";
         values[i] = gridData[indexOf(indices[i], gridSize)];
     }
 
@@ -216,7 +203,7 @@ static inline uint32_t RealColorToUint32(float4 real_color) {
     return red | (green << 8) | (blue << 16) | (alpha << 24);
 }
 
-void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, uint32_t height) {
+void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             float3 rayDir = EyeRayDir((float(x) + 0.5f) / float(width), (float(y) + 0.5f) / float(height), m_worldViewProjInv);
@@ -228,18 +215,17 @@ void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, u
 
             float4 resColor(0.0f);
             float alpha = 1.0f;
-            resColor = RaymarchSpherical(rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, alpha, grid.data(), gridSize);
+            resColor = RaymarchSpherical(rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, alpha, grid, gridSize);
 
-            //std::cout << resColor.x << "\n";
             out_color[y * width + x] = RealColorToUint32(resColor);
         };
     };
 }
 
-void RayMarcherExample::RayMarch(uint32_t* out_color, uint32_t width, uint32_t height)
+void RayMarcherExample::RayMarch(uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height)
 { 
   auto start = std::chrono::high_resolution_clock::now();
-  kernel2D_RayMarch(out_color, width, height);
+  kernel2D_RayMarch(out_color, grid, width, height);
   rayMarchTime = float(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count())/1000.f;
 }  
 

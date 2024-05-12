@@ -215,7 +215,7 @@ float eval_sh(inout float[SH_WIDTH] sh, vec3 rayDir) {
   return sum;
 }
 
-CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[128], int gridSize) {
+CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[100], int gridSize) {
     const float EPS = 0.01f;
 
     CellData result;
@@ -255,7 +255,7 @@ CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[128], int gridSiz
     Cell cell = trilerp(values, coeffs);
 
     result.density = cell.density;
-    result.color = vec3(eval_sh(cell.sh_r, rd),eval_sh(cell.sh_g, rd),eval_sh(cell.sh_b, rd));
+    result.color = vec3(eval_sh(cell.sh_r, rd), eval_sh(cell.sh_g, rd), eval_sh(cell.sh_b, rd));
 
     return result;
 }

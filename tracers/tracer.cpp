@@ -81,16 +81,11 @@ Cell trilerp(Cell* values, float3 pos) {
     Cell third = mult(add(mult(values[4], n.z), mult(values[5], pos.z)), n.y);
     Cell fourth = mult(add(mult(values[6], n.z), mult(values[7], pos.z)), pos.y);
 
-
-    // return ((values[0b000] * n.z + values[0b001] * pos.z) * n.y
-    //     + (values[0b010] * n.z + values[0b011] * pos.z) * pos.y) * n.x
-    //     + ((values[0b100] * n.z + values[0b101] * pos.z) * n.y
-    //         + (values[0b110] * n.z + values[0b111] * pos.z) * pos.y) * pos.x;
     return add(mult(add(first, second), n.x), mult(add(third, fourth), pos.x));
 }
 
 int indexOf(float3 pos, int gridSize) {
-    return pos.x + gridSize * pos.y + gridSize * gridSize * pos.z;
+    return pos.x + gridSize * pos.z + gridSize * gridSize * pos.y;
 }
 
 
@@ -202,8 +197,6 @@ float4 RaymarchSpherical(float3 ro, float3 rd, float tmin, float tmax, float& al
         densitySum += stepSize * cell.density;
     }
 
-    //std::cout << color.x << " " << color.y << " " << color.z << "\n";
-
     return to_float4(color, alpha);
 }
 
@@ -217,6 +210,9 @@ static inline uint32_t RealColorToUint32(float4 real_color) {
 }
 
 void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, uint32_t height) {
+#pragma omp parallel
+{
+  #pragma omp for
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             float3 rayDir = EyeRayDir((float(x) + 0.5f) / float(width), (float(y) + 0.5f) / float(height), m_worldViewProjInv);
@@ -234,6 +230,7 @@ void RayMarcherExample::kernel2D_RayMarch(uint32_t* out_color, uint32_t width, u
             out_color[y * width + x] = RealColorToUint32(resColor);
         };
     };
+}
 }
 
 void RayMarcherExample::RayMarch(uint32_t* out_color, uint32_t width, uint32_t height)

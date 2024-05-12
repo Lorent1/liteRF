@@ -17,30 +17,6 @@ struct Cell {
   float sh_b[SH_WIDTH];
 };
 
-// static inline Cell operator* (Cell cell, float number) {
-//     cell.density *= number;
-
-//     for (size_t i = 0; i < SH_WIDTH; i++) {
-//         cell.sh_r[i] *= number;
-//         cell.sh_g[i] *= number;
-//         cell.sh_b[i] *= number;
-//     }
-
-//     return cell;
-// };
-
-// static inline Cell operator+ (Cell a, Cell b) {
-//     a.density += b.density;
-
-//     for (size_t i = 0; i < SH_WIDTH; i++) {
-//         a.sh_r[i] += b.sh_r[i];
-//         a.sh_g[i] += b.sh_g[i];
-//         a.sh_b[i] += b.sh_b[i];
-//     }
-    
-//     return a;
-// };
-
 struct BoundingBox {
   float3 min;
   float3 max;

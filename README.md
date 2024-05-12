@@ -1,36 +1,39 @@
-# LiteRF
-implementation of various radiance fields in C++
+# liteRF
+Световые поля
 
-# Build (CPU):
-
-1. clone this repo:
-   * git clone https://github.com/msu-graphics-group/LiteRF.git
-   * cd LiteRF 
-2. clone submodules:
+# Устанока
+1. Клонировать репозиторий:X
+   * git clone https://github.com/Lorent1/liteRF
+   * cd liteRF 
+2. Сабмодули:
    * git submodule init && git submodule update 
-3. use Cmake to build project:
-   * mkdir cmake-build-release && cd cmake-build-release
+3. Установить модель (модель 2 - 256x256x256):
+   * https://drive.google.com/file/d/1hhns6AGGUv28U9DQVfnYYTRjTdp60NHT/view?usp=drive_link
+
+# Сборка (CPU):
+Сборка, используя Cmake
+   * mkdir build-cpu && cd cmake-cpu
    * cmake -DCMAKE_BUILD_TYPE=Release ..
-   * make -j 8  
+   * make -j 8
 
-# Build (GPU):
-
-1. clone and build kernel_slicer (https://github.com/Ray-Tracing-Systems/kernel_slicer) in some directory
-2. find and use VS Code config 'Launch (LiteRF)' in 'kernel_slicer/.vscode/launch.json':
-   * you need to change all paths to your LiteRF sources
-   * launch kernel_slicer with this config
-   * you can make you own command line script if don't like VS Code configs
-   * alternatively you can use bash/bat scripts:
-      * bash setup.sh my/path/kernel_slicer/cmake-build-release/kslicer my/path/to/kernel_slicer (once)
-      * bash bash run_kslicer.sh
-      
-3. build shaders:
-   * cd example_tracer/shaders_generated && bash build.sh
-   * or use record 'Build Shaders (GLSL, example_tracer)' in vs code config 'tasks.json': just press 'Ctr+Shift+B'
-4. use Cmake to build project with 'USE_VULKAN' flag == 'ON':
-   * mkdir cmake-build-release && cd cmake-build-release
+# Сборка (GPU) (ВНИМАНИЕ! Версия GPU не будет работать корректно, проблемы с копированием сетки на GPU, не хватило времени): 
+Сборка, используя Cmake с флагом 'USE_VULKAN' == 'ON':
+   * mkdir build-gpu && cd build-gpu
    * cmake -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON ..
    * make -j 8
-   * Note that the program will seek for 'example_tracer/shaders_generated/kernel2D_RayMarch.comp.spv' 
-   * Therefore you have to run it from LiteRF root folder (what is done by default in VS Code config) or copy appropriate SPIR-V file to get 'cmake-build-release/example_tracer/shaders_generated/kernel2D_RayMarch.comp.spv'
-   
+
+# Время работы
+
+Результатом программы является файлы вида `out_cpu_{i}.bmp`
+
+Все расчеты проводились на ноутбуке - HP Victus / `Ryzen 5 5600H` / `GeForce RTX 3050Ti 4GB` / 16GB
+
+За основу была взята модель размеров `256^3`, в таблице указано время на отрисовку одного кадра в разрешении `512x512`
+
+| Вычислитель/Разрешение      | 512x512      |
+| --------------------------- | -------------|
+| CPU (1 поток)               | 25.722 c     |
+| CPU (многопоточный)         | 4.227 с      | 
+| GPU (без учета копирования) | -            |
+| GPU (с учетом копирования)  | -            |
+| GPU (время копирования)     | -            | 

@@ -22,8 +22,8 @@ int main(int argc, const char** argv)
     bool enableValidationLayers = false;
 #endif
 
-    uint WIN_WIDTH = 128;
-    uint WIN_HEIGHT = 128;
+    uint WIN_WIDTH = 512;
+    uint WIN_HEIGHT = 512;
 
     std::shared_ptr<RayMarcherExample> pImpl = nullptr;
 #ifdef USE_VULKAN
@@ -42,7 +42,7 @@ int main(int argc, const char** argv)
     pImpl->CommitDeviceData();
 
     std::vector<uint> pixelData(WIN_WIDTH * WIN_HEIGHT);
-    char* filename = "./model.dat";
+    char* filename = "./model2.dat";
 
     size_t gridSize = 128;
     float factor = 1;

@@ -35,7 +35,8 @@
 /build
 .vscode
 out_*
-model.*
+model*
 cmake-build-*
+build*
 
 config.txt

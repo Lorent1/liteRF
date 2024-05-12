@@ -68,7 +68,6 @@ void main()
             float alpha = 1.0f;
             resColor = RaymarchSpherical_grid(rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, alpha, 0, ubo.gridSize);
 
-            //std::cout << resColor.x << "\n";
             out_color[uint(y) * kgenArgs.width + uint(x)] = RealColorToUint32(resColor);
         
   }

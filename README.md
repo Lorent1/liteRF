@@ -15,12 +15,14 @@
    * mkdir build-cpu && cd cmake-cpu
    * cmake -DCMAKE_BUILD_TYPE=Release ..
    * make -j 8
+Использовать Run (cpu) в vscode
 
 # Сборка (GPU) (ВНИМАНИЕ! Версия GPU не будет работать корректно, проблемы с копированием сетки на GPU, не хватило времени): 
 Сборка, используя Cmake с флагом 'USE_VULKAN' == 'ON':
    * mkdir build-gpu && cd build-gpu
    * cmake -DCMAKE_BUILD_TYPE=Release -DUSE_VULKAN=ON ..
    * make -j 8
+Использовать Run (gpu) в vscode
 
 # Время работы
 

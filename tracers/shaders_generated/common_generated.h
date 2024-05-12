@@ -79,7 +79,6 @@ struct Cell {
   float sh_g[SH_WIDTH];
   float sh_b[SH_WIDTH];
 };
-
 struct BoundingBox {
   vec3 min;
   vec3 max;
@@ -89,7 +88,6 @@ struct CellData {
     vec3 color;
     float density;
 };
-
 
 #ifndef SKIP_UBO_INCLUDE
 #include "include/RayMarcherExample_generated_ubo.h"
@@ -141,7 +139,7 @@ mat3 make_float3x3(vec3 a, vec3 b, vec3 c) { // different way than mat3(a,b,c)
               a.z, b.z, c.z);
 }
 
-void sh_eval_2(in vec3 d, inout float[SH_WIDTH] sh_coeffs) {
+void sh_eval_2(in vec3 d, inout float sh_coeffs[SH_WIDTH]) {
     float x = d.x, y = d.y, z = d.z, z2 = z * z;
     float c0, c1, s0, s1, tmp_a, tmp_b, tmp_c;
 
@@ -165,11 +163,7 @@ void sh_eval_2(in vec3 d, inout float[SH_WIDTH] sh_coeffs) {
     sh_coeffs[4] = tmp_c * s1;
 }
 
-int indexOf(vec3 pos, int gridSize) {
-    return int(pos.x + float(gridSize) * pos.y + gridSize * gridSize * pos.z);
-}
-
-Cell mult(Cell cell, float number){
+Cell mult(Cell cell, float number) {
   cell.density *= number;
 
   for (uint i = 0; i < SH_WIDTH; i++) {
@@ -181,7 +175,7 @@ Cell mult(Cell cell, float number){
   return cell;
 }
 
-Cell add(Cell rh, Cell lh){
+Cell add(Cell rh, Cell lh) {
   rh.density += lh.density;
 
   for (uint i = 0; i < SH_WIDTH; i++) {
@@ -193,18 +187,11 @@ Cell add(Cell rh, Cell lh){
   return rh;
 }
 
-Cell trilerp(inout Cell[8] values, vec3 pos) {
-    vec3 n = vec3(1.0f - pos.x,1.0f - pos.y,1.0f - pos.z);
-
-    Cell first = mult(add(mult(values[0], n.z), mult(values[1], pos.z)), n.y);
-    Cell second = mult(add(mult(values[2], n.z), mult(values[3], pos.z)), pos.y);
-    Cell third = mult(add(mult(values[4], n.z), mult(values[5], pos.z)), n.y);
-    Cell fourth = mult(add(mult(values[6], n.z), mult(values[7], pos.z)), pos.y);
-
-    return add(mult(add(first, second), n.x), mult(add(third, fourth), pos.x));
+int indexOf(vec3 pos, int gridSize) {
+    return int(pos.x + gridSize * pos.y + gridSize * gridSize * pos.z);
 }
 
-float eval_sh(inout float[SH_WIDTH] sh, vec3 rayDir) {
+float eval_sh(inout float sh[SH_WIDTH], vec3 rayDir) {
   float sh_coeffs[SH_WIDTH];
   sh_eval_2(rayDir, sh_coeffs);
 
@@ -215,7 +202,18 @@ float eval_sh(inout float[SH_WIDTH] sh, vec3 rayDir) {
   return sum;
 }
 
-CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[100], int gridSize) {
+Cell trilerp(inout Cell values[8], vec3 pos) {
+    vec3 n = vec3(1.0f - pos.x,1.0f - pos.y,1.0f - pos.z);
+
+    Cell first = mult(add(mult(values[0], n.z), mult(values[1], pos.z)), n.y);
+    Cell second = mult(add(mult(values[2], n.z), mult(values[3], pos.z)), pos.y);
+    Cell third = mult(add(mult(values[4], n.z), mult(values[5], pos.z)), n.y);
+    Cell fourth = mult(add(mult(values[6], n.z), mult(values[7], pos.z)), pos.y);
+
+    return add(mult(add(first, second), n.x), mult(add(third, fourth), pos.x));
+}
+
+CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[10], int gridSize) {
     const float EPS = 0.01f;
 
     CellData result;
@@ -231,7 +229,7 @@ CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[100], int gridSiz
 
     vec3 floor_pos = floor(vec3(pos.x,pos.y,pos.z));
 
-    if (floor_pos.x + 1 > float(gridSize) || floor_pos.y + 1 > float(gridSize) || floor_pos.z + 1 > float(gridSize)) {
+    if (floor_pos.x + 1 >= float(gridSize) || floor_pos.y + 1 >= float(gridSize) || floor_pos.z + 1 >= float(gridSize)) {
         return result;
     }
 
@@ -248,6 +246,7 @@ CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[100], int gridSiz
     indices[7] = vec3(floor_pos.x + 1,floor_pos.y + 1,floor_pos.z + 1);
 
     for (int i = 0; i < 8; i++) {
+        //std::cout << "\n" << indices[i].z << "\n";
         values[i] = gridData[indexOf(indices[i], gridSize)];
     }
 
@@ -255,16 +254,18 @@ CellData eval_trilinear(vec3 pos, vec3 rd, inout Cell gridData[100], int gridSiz
     Cell cell = trilerp(values, coeffs);
 
     result.density = cell.density;
-    result.color = vec3(eval_sh(cell.sh_r, rd), eval_sh(cell.sh_g, rd), eval_sh(cell.sh_b, rd));
+    result.color = vec3(eval_sh(cell.sh_r, rd),eval_sh(cell.sh_g, rd),eval_sh(cell.sh_b, rd));
 
     return result;
 }
 
-vec3 EyeRayDir(float x, float y, mat4 a_mViewProjInv) {
-  vec4 pos = vec4(2.0f*x - 1.0f,2.0f*y - 1.0f,0.0f,1.0f);
-  pos = a_mViewProjInv * pos;
-  pos /= pos.w;
-  return normalize(pos.xyz);
+uint RealColorToUint32(vec4 real_color) {
+    int red = max(0, min(255, int((real_color[0] * 255.0f))));
+    int green = max(0, min(255, int((real_color[1] * 255.0f))));
+    int blue = max(0, min(255, int((real_color[2] * 255.0f))));
+    int alpha = max(0, min(255, int((real_color[3] * 255.0f))));
+
+    return red | (green << 8) | (blue << 16) | (alpha << 24);
 }
 
 void transform_ray3f(mat4 a_mWorldViewInv, inout vec3 ray_pos, inout vec3 ray_dir) {
@@ -301,13 +302,11 @@ vec2 RayBoxIntersection(vec3 ray_pos, vec3 ray_dir, vec3 boxMin, vec3 boxMax) {
   return vec2(tmin,tmax);
 }
 
-uint RealColorToUint32(vec4 real_color) {
-    int red = max(0, min(255, int((real_color[0] * 255.0f))));
-    int green = max(0, min(255, int((real_color[1] * 255.0f))));
-    int blue = max(0, min(255, int((real_color[2] * 255.0f))));
-    int alpha = max(0, min(255, int((real_color[3] * 255.0f))));
-
-    return red | (green << 8) | (blue << 16) | (alpha << 24);
+vec3 EyeRayDir(float x, float y, mat4 a_mViewProjInv) {
+  vec4 pos = vec4(2.0f*x - 1.0f,2.0f*y - 1.0f,0.0f,1.0f);
+  pos = a_mViewProjInv * pos;
+  pos /= pos.w;
+  return normalize(pos.xyz);
 }
 
 #define KGEN_FLAG_RETURN            1

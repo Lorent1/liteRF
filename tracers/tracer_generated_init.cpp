@@ -147,7 +147,6 @@ RayMarcherExample_Generated::~RayMarcherExample_Generated()
  
   vkDestroyBuffer(device, m_classDataBuffer, nullptr);
 
-  vkDestroyBuffer(device, m_vdata.gridBuffer, nullptr);
   FreeAllAllocations(m_allMems);
 }
 
@@ -229,8 +228,6 @@ void RayMarcherExample_Generated::InitBuffers(size_t a_maxThreadsCount, bool a_t
 
 void RayMarcherExample_Generated::ReserveEmptyVectors()
 {
-  if(grid.capacity() == 0)
-    grid.reserve(4);
 }
 
 void RayMarcherExample_Generated::InitMemberBuffers()
@@ -238,8 +235,6 @@ void RayMarcherExample_Generated::InitMemberBuffers()
   std::vector<VkBuffer> memberVectors;
   std::vector<VkImage>  memberTextures;
 
-  m_vdata.gridBuffer = vk_utils::createBuffer(device, grid.capacity()*sizeof(struct Cell), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  memberVectors.push_back(m_vdata.gridBuffer);
 
 
   AllocMemoryForMemberBuffersAndImages(memberVectors, memberTextures);

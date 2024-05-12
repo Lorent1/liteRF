@@ -34,8 +34,6 @@ void RayMarcherExample_Generated::UpdatePlainMembers(std::shared_ptr<vk_utils::I
   m_uboData.bb = bb;
   m_uboData.gridSize = gridSize;
   m_uboData.rayMarchTime = rayMarchTime;
-  m_uboData.grid_size     = uint32_t( grid.size() );     assert( grid.size() < maxAllowedSize );
-  m_uboData.grid_capacity = uint32_t( grid.capacity() ); assert( grid.capacity() < maxAllowedSize );
   a_pCopyEngine->UpdateBuffer(m_classDataBuffer, 0, &m_uboData, sizeof(m_uboData));
 }
 
@@ -47,20 +45,17 @@ void RayMarcherExample_Generated::ReadPlainMembers(std::shared_ptr<vk_utils::ICo
   bb = m_uboData.bb;
   gridSize = m_uboData.gridSize;
   rayMarchTime = m_uboData.rayMarchTime;
-  grid.resize(m_uboData.grid_size);
 }
 
 void RayMarcherExample_Generated::UpdateVectorMembers(std::shared_ptr<vk_utils::ICopyEngine> a_pCopyEngine)
 {
-  if(grid.size() > 0)
-    a_pCopyEngine->UpdateBuffer(m_vdata.gridBuffer, 0, grid.data(), grid.size()*sizeof(struct Cell) );
 }
 
 void RayMarcherExample_Generated::UpdateTextureMembers(std::shared_ptr<vk_utils::ICopyEngine> a_pCopyEngine)
 { 
 }
 
-void RayMarcherExample_Generated::RayMarchCmd(uint32_t* out_color, uint32_t width, uint32_t height)
+void RayMarcherExample_Generated::RayMarchCmd(uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height)
 {
   uint32_t blockSizeX = 32;
   uint32_t blockSizeY = 8;
@@ -143,14 +138,14 @@ void RayMarcherExample_Generated::BarriersForSeveralBuffers(VkBuffer* a_inBuffer
   }
 }
 
-void RayMarcherExample_Generated::RayMarchCmd(VkCommandBuffer a_commandBuffer, uint32_t* out_color, uint32_t width, uint32_t height)
+void RayMarcherExample_Generated::RayMarchCmd(VkCommandBuffer a_commandBuffer, uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height)
 {
   m_currCmdBuffer = a_commandBuffer;
   VkMemoryBarrier memoryBarrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT }; 
   
   auto start = std::chrono::high_resolution_clock::now();
   vkCmdBindDescriptorSets(a_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, RayMarchLayout, 0, 1, &m_allGeneratedDS[0], 0, nullptr);
-  RayMarchCmd(out_color, width, height);
+  RayMarchCmd(out_color, grid, width, height);
   vkCmdPipelineBarrier(m_currCmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
   rayMarchTime = float(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count())/1000.f;
 
@@ -158,7 +153,7 @@ void RayMarcherExample_Generated::RayMarchCmd(VkCommandBuffer a_commandBuffer, u
 
 
 
-void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, uint32_t width, uint32_t height)
+void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height)
 {
   // (1) get global Vulkan context objects
   //
@@ -182,6 +177,8 @@ void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, uint32_t width, 
   auto beforeCreateObjects = std::chrono::high_resolution_clock::now();
   VkBuffer out_colorGPU = vk_utils::createBuffer(device, width*height*sizeof(uint32_t ), outFlags);
   buffers.push_back(out_colorGPU);
+  VkBuffer gridGPU = vk_utils::createBuffer(device, gridSize*gridSize*gridSize*sizeof(Cell ), outFlags);
+  buffers.push_back(gridGPU);
   
 
   VkDeviceMemory buffersMem = VK_NULL_HANDLE; // vk_utils::allocateAndBindWithPadding(device, physicalDevice, buffers);
@@ -220,7 +217,7 @@ void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, uint32_t width, 
   m_exTimeRayMarch.msAPIOverhead += std::chrono::duration_cast<std::chrono::microseconds>(afterInitBuffers - afterCreateObjects).count()/1000.f;
   
   auto beforeSetInOut = std::chrono::high_resolution_clock::now();
-  this->SetVulkanInOutFor_RayMarch(out_colorGPU, 0, 0); 
+  this->SetVulkanInOutFor_RayMarch(out_colorGPU, 0, gridGPU, 0, 0); 
 
   // (3) copy input data to GPU
   //
@@ -239,7 +236,7 @@ void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, uint32_t width, 
     beginCommandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginCommandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
     vkBeginCommandBuffer(commandBuffer, &beginCommandBufferInfo);
-    RayMarchCmd(commandBuffer, out_color, width, height);      
+    RayMarchCmd(commandBuffer, out_color, grid, width, height);      
     vkEndCommandBuffer(commandBuffer);  
     auto start = std::chrono::high_resolution_clock::now();
     vk_utils::executeCommandBufferNow(commandBuffer, computeQueue, device);
@@ -252,6 +249,7 @@ void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, uint32_t width, 
   //
   auto beforeCopy2 = std::chrono::high_resolution_clock::now();
   pCopyHelper->ReadBuffer(out_colorGPU, 0, out_color, width*height*sizeof(uint32_t ));
+  pCopyHelper->ReadBuffer(gridGPU, 0, grid, gridSize*gridSize*gridSize*sizeof(Cell ));
   this->ReadPlainMembers(pCopyHelper);
   afterCopy2 = std::chrono::high_resolution_clock::now();
   m_exTimeRayMarch.msCopyFromGPU = std::chrono::duration_cast<std::chrono::microseconds>(afterCopy2 - beforeCopy2).count()/1000.f;
@@ -259,6 +257,7 @@ void RayMarcherExample_Generated::RayMarch(uint32_t* out_color, uint32_t width, 
   // (6) free resources 
   //
   vkDestroyBuffer(device, out_colorGPU, nullptr);
+  vkDestroyBuffer(device, gridGPU, nullptr);
   if(buffersMem != VK_NULL_HANDLE)
     vkFreeMemory(device, buffersMem, nullptr);
   if(imagesMem != VK_NULL_HANDLE)

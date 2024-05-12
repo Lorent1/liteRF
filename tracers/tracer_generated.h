@@ -29,10 +29,14 @@ public:
   virtual void SetVulkanInOutFor_RayMarch(
     VkBuffer out_colorBuffer,
     size_t   out_colorOffset,
+    VkBuffer gridBuffer,
+    size_t   gridOffset,
     uint32_t dummyArgument = 0)
   {
     RayMarch_local.out_colorBuffer = out_colorBuffer;
     RayMarch_local.out_colorOffset = out_colorOffset;
+    RayMarch_local.gridBuffer = gridBuffer;
+    RayMarch_local.gridOffset = gridOffset;
     InitAllGeneratedDescriptorSets_RayMarch();
   }
 
@@ -64,9 +68,9 @@ public:
   virtual void ReadPlainMembers(std::shared_ptr<vk_utils::ICopyEngine> a_pCopyEngine);
   static VkPhysicalDeviceFeatures2 ListRequiredDeviceFeatures(std::vector<const char*>& deviceExtensions);
   
-  virtual void RayMarchCmd(VkCommandBuffer a_commandBuffer, uint32_t* out_color, uint32_t width, uint32_t height);
+  virtual void RayMarchCmd(VkCommandBuffer a_commandBuffer, uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height);
 
-  void RayMarch(uint32_t* out_color, uint32_t width, uint32_t height) override;
+  void RayMarch(uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height) override;
 
   inline vk_utils::ExecTime GetRayMarchExecutionTime() const { return m_exTimeRayMarch; }
 
@@ -74,7 +78,7 @@ public:
 
   virtual void copyKernelFloatCmd(uint32_t length);
   
-  virtual void RayMarchCmd(uint32_t* out_color, uint32_t width, uint32_t height);
+  virtual void RayMarchCmd(uint32_t* out_color, Cell* grid, uint32_t width, uint32_t height);
   
   struct MemLoc
   {
@@ -120,6 +124,8 @@ protected:
   {
     VkBuffer out_colorBuffer = VK_NULL_HANDLE;
     size_t   out_colorOffset = 0;
+    VkBuffer gridBuffer = VK_NULL_HANDLE;
+    size_t   gridOffset = 0;
     bool needToClearOutput = false;
   } RayMarch_local;
 
@@ -127,8 +133,6 @@ protected:
 
   struct MembersDataGPU
   {
-    VkBuffer gridBuffer = VK_NULL_HANDLE;
-    size_t   gridOffset = 0;
   } m_vdata;
   
   

@@ -35,8 +35,6 @@ struct RayMarcherExample_Generated_UBO_Data
   #endif 
   int gridSize; 
   float rayMarchTime; 
-  uint grid_capacity; 
-  uint grid_size; 
   uint dummy_last;
 };
 

@@ -144,8 +144,8 @@ void RayMarcherExample_Generated::InitAllGeneratedDescriptorSets_RayMarch()
     writeDescriptorSet[0].pTexelBufferView = nullptr; 
 
     descriptorBufferInfo[1]        = VkDescriptorBufferInfo{};
-    descriptorBufferInfo[1].buffer = m_vdata.gridBuffer;
-    descriptorBufferInfo[1].offset = m_vdata.gridOffset;
+    descriptorBufferInfo[1].buffer = RayMarch_local.gridBuffer;
+    descriptorBufferInfo[1].offset = RayMarch_local.gridOffset;
     descriptorBufferInfo[1].range  = VK_WHOLE_SIZE;  
     writeDescriptorSet[1]                  = VkWriteDescriptorSet{};
     writeDescriptorSet[1].sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

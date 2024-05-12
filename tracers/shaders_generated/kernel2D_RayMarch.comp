@@ -4,11 +4,11 @@
 #include "common_generated.h"
 
 layout(binding = 0, set = 0) buffer data0 { uint out_color[]; }; //
-layout(binding = 1, set = 0) buffer data1 { Cell grid[100]; }; //
+layout(binding = 1, set = 0) buffer data1 { Cell grid[10]; }; //
 layout(binding = 2, set = 0) buffer dataUBO { RayMarcherExample_Generated_UBO_Data ubo; };
 
 vec4 RaymarchSpherical_grid(vec3 ro, vec3 rd, float tmin, float tmax, inout float alpha, uint gridDataOffset, int gridSize) {
-    float stepSize = (tmax - tmin) / 250.0f;
+    float stepSize =(tmax - tmin) / 250.0f;
 
     vec3 color = vec3(0.0f);
     float densitySum = 0.0f;
@@ -26,6 +26,8 @@ vec4 RaymarchSpherical_grid(vec3 ro, vec3 rd, float tmin, float tmax, inout floa
 
         densitySum += stepSize * cell.density;
     }
+
+    //std::cout << color.x << " " << color.y << " " << color.z << "\n";
 
     return vec4(color, alpha);
 }
@@ -68,10 +70,8 @@ void main()
             float alpha = 1.0f;
             resColor = RaymarchSpherical_grid(rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, alpha, 0, ubo.gridSize);
 
-            vec3 test = vec3(ubo.gridSize) / 256.0f;
-
-            //std::cout << resColor.x << "\n";
             out_color[uint(y) * kgenArgs.width + uint(x)] = RealColorToUint32(resColor);
         
   }
 }
+
